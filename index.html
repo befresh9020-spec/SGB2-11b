@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interaktives Übungstool zur Einkommensanrechnung nach § 11b SGB II (Bürgergeld) mit Musterlösung und Zufallsfällen.">
+<title>§ 11b SGB II · Einkommensrechner</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f472b6">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* ============================================================
+   1. TOKENS
+   ============================================================ */
+:root{
+  --bg:#f4f0ea; --text:#111; --box:#fff; --input-bg:#fff;
+  --gesetz-bg:#e2e8f0; --gesetz-text:#111;
+  --border:#111; --shadow:#111;
+  --muted-bg:#d8d3ca; --muted-text:#4a4a4a;
+  --gelb:#fde047; --pink:#f472b6; --gruen:#4ade80;
+  --blau:#38bdf8; --rot:#fb7185; --orange:#fb923c; --lila:#c084fc;
+  --rahmen:4px solid var(--border);
+  --rahmen-s:3px solid var(--border);
+  --schatten:6px 6px 0 var(--shadow);
+  --schatten-s:3px 3px 0 var(--shadow);
+  --mono:'Courier New',Courier,monospace;
+  --serif:Arial,Helvetica,sans-serif;
+}
+body.dunkel{
+  --bg:#1e1e24; --text:#f8fafc; --box:#2b2d39; --input-bg:#16161b;
+  --gesetz-bg:#475569; --gesetz-text:#f8fafc;
+  --border:#0b0c10; --shadow:#050505;
+  --muted-bg:#3a3c49; --muted-text:#c2c8d2;
+  --gelb:#a16207; --pink:#9d174d; --gruen:#15803d;
+  --blau:#0369a1; --rot:#9f1239; --orange:#c2410c; --lila:#6d28d9;
+}
+*{box-sizing:border-box}
+
+body{
+  font-family:var(--mono);
+  max-width:1240px; margin:0 auto; padding:24px 18px 60px;
+  background:var(--bg); color:var(--text);
+  transition:background-color .25s,color .25s;
+}
+
+/* ============================================================
+   2. FOKUS / BEWEGUNG
+   ============================================================ */
+:focus{outline:none}
+:focus-visible{
+  outline:4px solid var(--orange);
+  outline-offset:3px;
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}
+  .knopf:hover,.knopf:active{transform:none!important}
+}
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+.sprungmarke{
+  position:absolute;left:-9999px;top:0;z-index:99;
+  background:var(--gelb);color:#111;border:var(--rahmen);
+  padding:12px 18px;font-weight:900;text-transform:uppercase;
+}
+.sprungmarke:focus{left:8px;top:8px}
+
+/* ============================================================
+   3. KOPFBEREICH
+   ============================================================ */
+.kopf{display:flex;justify-content:space-between;align-items:stretch;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+h1{
+  background:var(--pink); border:var(--rahmen); box-shadow:var(--schatten);
+  padding:14px 20px; font-size:1.6rem; line-height:1.25;
+  text-transform:uppercase; font-weight:900; margin:0; flex:1 1 320px;
+  color:var(--text);
+}
+h1 small{display:block;font-size:.62em;font-weight:700;text-transform:none;opacity:.85;margin-top:4px}
+
+/* ============================================================
+   4. KNÖPFE
+   ============================================================ */
+.knopf{
+  font-family:inherit; font-weight:900; text-transform:uppercase;
+  cursor:pointer; color:var(--text); background:var(--box);
+  border:var(--rahmen); box-shadow:4px 4px 0 var(--shadow);
+  padding:12px 16px; font-size:1rem; transition:transform .1s,box-shadow .1s;
+}
+@media (hover:hover){
+  .knopf:hover:not(:disabled){transform:translate(2px,2px);box-shadow:2px 2px 0 var(--shadow)}
+}
+.knopf:active:not(:disabled){transform:translate(4px,4px);box-shadow:0 0 0 var(--shadow)}
+.knopf:disabled{
+  background:var(--muted-bg); color:var(--muted-text);
+  border-color:var(--muted-text); box-shadow:none;
+  transform:translate(4px,4px); cursor:not-allowed;
+}
+.knopf-gross{font-size:1.15rem;padding:15px 20px;box-shadow:6px 6px 0 var(--shadow)}
+.knopf-primaer{background:var(--gruen)}
+.knopf-zweit{background:var(--lila)}
+.knopf-loeschen{background:var(--rot);padding:8px 13px;box-shadow:2px 2px 0 var(--shadow)}
+.knopf[aria-pressed="true"]{background:var(--gelb);transform:translate(2px,2px);box-shadow:2px 2px 0 var(--shadow)}
+
+.modus-leiste{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.modus-leiste .knopf{flex:1 1 220px}
+
+/* ============================================================
+   5. FALLAUSWAHL
+   ============================================================ */
+.fall-leiste{
+  background:var(--blau); border:var(--rahmen); box-shadow:var(--schatten);
+  padding:16px 18px; margin-bottom:24px;
+  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;
+}
+.fall-leiste .feld{flex:1 1 320px}
+.fall-leiste label{display:block;font-weight:900;text-transform:uppercase;margin-bottom:8px;font-size:1rem}
+select{
+  width:100%; padding:12px; font-family:inherit; font-size:1rem; font-weight:700;
+  border:var(--rahmen-s); box-shadow:var(--schatten-s);
+  background:var(--box); color:var(--text); cursor:pointer;
+}
+
+/* ============================================================
+   6. LAYOUT
+   ============================================================ */
+.layout{display:grid;grid-template-columns:1fr;gap:26px}
+@media (min-width:1024px){
+  .layout{grid-template-columns:minmax(300px,380px) 1fr;align-items:start}
+  .spalte-fall{position:sticky;top:18px}
+}
+/* Einspaltig: Sachverhalt und Merksatz zuerst, Punktestand ans Ende */
+@media (max-width:1023px){
+  .layout{gap:16px}
+  .spalte-fall{display:contents}
+  #fallText{order:1} #fallHinweis{order:2}
+  .spalte-rechnung{order:3} #statusBox{order:4}
+  #fallText,#fallHinweis{margin-bottom:0}
+}
+
+/* ============================================================
+   7. FALLTEXT / HINWEISE / STATUS
+   ============================================================ */
+.fallbeispiel{
+  background:var(--gelb); border:var(--rahmen); box-shadow:var(--schatten);
+  padding:18px; font-family:var(--serif); font-size:1.05rem; line-height:1.65;
+  margin-bottom:18px; color:#111;
+}
+body.dunkel .fallbeispiel{color:var(--text)}
+.fallbeispiel h2{font-family:var(--mono);font-size:1.05rem;text-transform:uppercase;margin:0 0 10px}
+.fallbeispiel .gruppe{font-weight:700;margin:14px 0 4px}
+.zusatzmarke{
+  font-family:var(--mono); font-size:.75rem; font-weight:900; text-transform:uppercase;
+  letter-spacing:.04em; background:var(--box); color:var(--text);
+  border:3px solid var(--border); box-shadow:3px 3px 0 var(--shadow);
+  padding:6px 10px; margin:0 0 14px; display:inline-block;
+}
+.fallbeispiel .zeile{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px dotted currentColor;padding:4px 0}
+.fallbeispiel .zeile span:first-child{min-width:0;flex:1 1 60%}
+.fallbeispiel .zeile span:last-child{font-family:var(--mono);white-space:nowrap}
+
+.hinweis{
+  background:var(--box); border:var(--rahmen); box-shadow:var(--schatten);
+  border-left:14px solid var(--orange);
+  padding:14px 16px; font-size:.95rem; line-height:1.55; margin-bottom:18px;
+}
+.hinweis strong{text-transform:uppercase}
+
+.status{
+  background:var(--box); border:var(--rahmen); box-shadow:var(--schatten);
+  padding:14px 16px; font-size:.95rem; line-height:1.7;
+}
+.status .wert{font-size:1.4rem;font-weight:900}
+
+/* ============================================================
+   8. RECHENSCHRITTE
+   ============================================================ */
+h2.abschnitt{
+  font-family:var(--mono); font-weight:900; font-size:1.05rem; text-transform:uppercase;
+  background:var(--text); color:var(--bg);
+  display:inline-block; padding:6px 14px; margin:32px 0 14px;
+  box-shadow:4px 4px 0 var(--orange);
+}
+h2.abschnitt:first-of-type{margin-top:0}
+h2.abschnitt.ergebnis{box-shadow:4px 4px 0 var(--rot)}
+
+.schritt{
+  background:var(--box); border:var(--rahmen-s); box-shadow:4px 4px 0 var(--shadow);
+  padding:14px 16px; margin-bottom:13px;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:12px;
+  border-left:10px solid transparent;
+}
+.schritt.ok{border-left-color:var(--gruen)}
+.schritt.fehler{border-left-color:var(--rot)}
+.schritt-text{flex:1 1 240px;min-width:0}
+.schritt label{display:block;font-weight:900;font-size:1.08rem;margin-bottom:6px}
+.gesetz{
+  display:inline-block; font-size:.8rem; font-weight:700;
+  background:var(--gesetz-bg); color:var(--gesetz-text);
+  padding:3px 7px; border:1px solid var(--border);
+}
+.eingabe-gruppe{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.05rem;flex-wrap:wrap}
+input[type=text]{
+  width:130px; padding:10px; text-align:right;
+  font-family:var(--mono); font-size:1.05rem; font-weight:700;
+  border:var(--rahmen-s); box-shadow:var(--schatten-s);
+  background:var(--input-bg); color:var(--text);
+}
+input[type=text][aria-invalid="true"]{background:color-mix(in srgb,var(--rot) 22%,var(--input-bg))}
+
+.schritt.summe{background:var(--gelb);color:#111}
+.schritt.final{background:var(--rot);color:#111}
+body.dunkel .schritt.summe,body.dunkel .schritt.final{color:var(--text)}
+.schritt.summe .gesetz,.schritt.final .gesetz{background:rgba(255,255,255,.75);color:#111}
+
+.rueckmeldung{
+  display:inline-block; min-width:118px; padding:5px 9px; text-align:center;
+  font-weight:900; font-size:.9rem; border:2px solid transparent; color:var(--text);
+}
+.rueckmeldung.ok{background:var(--gruen);border-color:var(--border);box-shadow:2px 2px 0 var(--shadow)}
+.rueckmeldung.fehler{background:var(--rot);border-color:var(--border);box-shadow:2px 2px 0 var(--shadow)}
+body.dunkel .rueckmeldung.ok,body.dunkel .rueckmeldung.fehler{color:#fff}
+
+/* Pro-Modus */
+.pro-zeile .pro-auswahl{width:100%;max-width:100%;padding:9px;font-size:.95rem;box-shadow:2px 2px 0 var(--shadow)}
+.pro-leer{
+  border:4px dashed var(--border); padding:20px; text-align:center;
+  font-weight:700; margin-bottom:16px; opacity:.85;
+}
+
+.knopf-reihe{display:flex;gap:16px;margin-top:30px;flex-wrap:wrap}
+.knopf-reihe .knopf{flex:1 1 200px}
+
+.rechenweg{
+  background:var(--box); border:var(--rahmen); box-shadow:var(--schatten);
+  border-top:14px solid var(--border);
+  padding:22px; margin-top:26px; font-family:var(--serif);
+  font-size:1rem; line-height:1.65;
+}
+.rechenweg h3{font-family:var(--mono);text-transform:uppercase;margin:0 0 12px;font-size:1.05rem}
+.rechenweg ul{margin:0;padding-left:20px}
+.rechenweg li{margin-bottom:10px}
+.rechenweg .summenzeile{
+  margin-top:16px;padding-top:12px;border-top:3px solid var(--border);
+  font-family:var(--mono);font-weight:900;font-size:1.05rem;
+}
+.rechenweg .merke{
+  margin-top:16px;padding:12px 14px;background:var(--gesetz-bg);color:var(--gesetz-text);
+  border-left:8px solid var(--orange);font-size:.95rem;
+}
+
+.tr-auf{
+  position:fixed; right:12px; bottom:12px; z-index:40;
+  padding:13px 15px; font-size:1.15rem; background:var(--lila);
+}
+.tr{
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  background:var(--box); border-top:var(--rahmen); box-shadow:0 -6px 0 var(--shadow);
+  padding:12px 14px 14px;
+}
+.tr-innen{max-width:1240px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#trEingabe{flex:1 1 240px;width:auto;max-width:none;text-align:left;font-size:1.1rem}
+.tr .knopf{flex:0 0 auto;padding:11px 13px;font-size:1rem;box-shadow:3px 3px 0 var(--shadow)}
+.tr-hilfe{flex:1 0 100%;margin:0;font-size:.78rem;opacity:.75}
+.tr-ergebnis{
+  flex:1 0 100%; margin:2px 0 0; padding:7px 10px; min-height:1.5em;
+  font-weight:900; font-size:1.15rem;
+  border-left:10px solid var(--gruen); background:var(--gesetz-bg); color:var(--gesetz-text);
+}
+.tr-ergebnis:empty{display:none}
+.tr-ergebnis.fehler{border-left-color:var(--rot);font-size:1rem}
+.tr-ergebnis .roh{display:block;font-size:.78rem;font-weight:400;opacity:.8}
+.tr-protokoll{flex:1 0 100%;list-style:none;margin:0;padding:0;font-size:.85rem}
+.tr-protokoll button{
+  background:none;border:0;font:inherit;color:inherit;cursor:pointer;
+  padding:3px 0;text-align:left;text-decoration:underline;text-underline-offset:3px;
+}
+
+footer{
+  margin-top:50px;padding-top:18px;border-top:4px solid var(--border);
+  font-size:.85rem;line-height:1.8;
+}
+footer a{color:inherit}
+
+/* ============================================================
+   9. KLEINE BILDSCHIRME
+   ============================================================ */
+@media (max-width:620px){
+  body{padding:12px 10px 40px}
+
+  /* Flex-Basis zuruecksetzen: in Spaltenrichtung waere sie eine Hoehenangabe */
+  .kopf{gap:8px;margin-bottom:12px}
+  h1{flex:1 1 auto;font-size:1.25rem;padding:12px 14px}
+  h1 small{font-size:.58em;margin-top:2px}
+  #themeToggle{flex:0 0 auto;padding:12px 14px;font-size:1.15rem}
+  .lang{display:none}
+
+  .modus-leiste{gap:8px;margin-bottom:12px}
+  .modus-leiste .knopf{flex:1 1 0;min-width:0;font-size:.85rem;padding:11px 6px}
+
+  .fall-leiste{padding:12px 14px;gap:10px;margin-bottom:16px}
+  .fall-leiste .feld{flex:1 1 auto}
+  .fall-leiste label{font-size:.9rem;margin-bottom:6px}
+  .schritt{flex-direction:column;align-items:stretch;padding:15px 16px}
+  .schritt-text{flex:1 1 auto;min-width:0}
+  .schritt label{font-size:1.12rem}
+
+  /* Feld nimmt die volle Breite, die Rueckmeldung rutscht in eine eigene Zeile */
+  .eingabe-gruppe{gap:9px}
+  input[type=text]{flex:1 1 auto;width:auto;max-width:none;font-size:1.15rem;padding:12px}
+  .rueckmeldung{flex:1 0 100%;min-width:0;font-size:.95rem;margin-top:2px}
+  .rueckmeldung:empty{display:none}
+
+  h2.abschnitt{font-size:1rem;margin:26px 0 12px}
+  .fallbeispiel{font-size:1.08rem}
+  .fallbeispiel h2{font-size:1.15rem}
+
+  /* Pruefen bleibt gross, die beiden Nebenaktionen teilen sich eine Zeile */
+  .knopf-reihe{gap:10px;margin-top:26px}
+  #btnPruefen{flex:1 1 100%;font-size:1.25rem}
+  #btnRechenweg,#btnLeeren{flex:1 1 calc(50% - 5px);font-size:.95rem;padding:13px 8px}
+  .status{font-size:.9rem}
+  .tr-auf{right:10px;bottom:10px;padding:12px 13px}
+  .tr .knopf{padding:11px 10px;font-size:.9rem}
+  #trEingabe{flex:1 1 100%}
+}
+
+/* ============================================================
+   10. DRUCK
+   ============================================================ */
+@media print{
+  body{max-width:none;color:#000;background:#fff;padding:0}
+  .sprungmarke,.modus-leiste,.fall-leiste,.knopf-reihe,#themeToggle,.status,
+  .tr,.tr-auf{display:none!important}
+  .layout{display:block}
+  .fallbeispiel,.hinweis,.schritt,.rechenweg,h1{
+    box-shadow:none!important;border:2px solid #000!important;background:#fff!important;color:#000!important;
+  }
+  .schritt{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<a class="sprungmarke" href="#rechenbereich">Zum Rechenbereich springen</a>
+
+<header class="kopf">
+  <h1>§ 11b SGB II <small id="kopfUnterzeile">Einkommensanrechnung – Übungstool</small></h1>
+  <button id="themeToggle" class="knopf" type="button" aria-pressed="false" aria-label="Zur dunklen Darstellung wechseln">🌙<span class="lang"> Dunkel</span></button>
+</header>
+
+<div class="modus-leiste" role="group" aria-label="Bearbeitungsmodus">
+  <button id="modusBasis" class="knopf" type="button" aria-pressed="true">Basis-Modus</button>
+  <button id="modusPro" class="knopf" type="button" aria-pressed="false">Pro-Modus<span class="lang"> (freies Schema)</span></button>
+</div>
+
+<div class="fall-leiste">
+  <div class="feld">
+    <label for="fallAuswahl">Übungsfall wählen</label>
+    <select id="fallAuswahl"></select>
+  </div>
+  <button id="btnNeuerFall" class="knopf" type="button" hidden>🎲 Neuer Zufallsfall</button>
+</div>
+
+<main class="layout" id="rechenbereich">
+  <aside class="spalte-fall">
+    <section class="fallbeispiel" id="fallText" aria-labelledby="fallUeberschrift"></section>
+    <div class="hinweis" id="fallHinweis"></div>
+    <div class="status" id="statusBox"></div>
+  </aside>
+
+  <section class="spalte-rechnung">
+    <div id="basisModus"></div>
+    <div id="proModus" hidden></div>
+
+    <div class="knopf-reihe">
+      <button id="btnPruefen" class="knopf knopf-gross knopf-primaer" type="button">Eingaben prüfen</button>
+      <button id="btnRechenweg" class="knopf knopf-gross knopf-zweit" type="button" disabled>Rechenweg zeigen</button>
+      <button id="btnLeeren" class="knopf knopf-gross" type="button">Felder leeren</button>
+    </div>
+
+    <div class="rechenweg" id="rechenwegBox" hidden></div>
+  </section>
+</main>
+
+<button id="trAuf" class="tr-auf knopf" type="button" aria-expanded="false" aria-controls="tr"
+        aria-label="Rechenzeile öffnen (Alt + R)">🧮<span class="lang"> Rechner</span></button>
+
+<div class="tr" id="tr" role="group" aria-label="Rechenzeile" hidden>
+  <div class="tr-innen">
+    <label class="sr-only" for="trEingabe">Rechenausdruck</label>
+    <input type="text" id="trEingabe" autocomplete="off" spellcheck="false"
+           placeholder="z. B. (1300-520)*30%">
+    <button id="trGleich" class="knopf" type="button">=</button>
+    <button id="trUebernehmen" class="knopf knopf-primaer" type="button" disabled>→ ins Feld</button>
+    <button id="trZu" class="knopf" type="button" aria-label="Rechenzeile schließen">✕</button>
+    <p class="tr-hilfe">Grundrechenarten, Klammern und % · Komma oder Punkt · Enter rechnet · Esc schließt</p>
+    <p class="tr-ergebnis" id="trErgebnis" role="status" aria-live="polite"></p>
+    <ul class="tr-protokoll" id="trProtokoll"></ul>
+  </div>
+</div>
+
+<p class="sr-only" id="liveStatus" role="status" aria-live="polite"></p>
+
+<footer id="fusszeile"></footer>
+
+<noscript>
+  <p style="border:4px solid #111;padding:16px;font-weight:900">
+    Dieses Übungstool benötigt JavaScript. Bitte aktivieren Sie JavaScript im Browser.
+  </p>
+</noscript>
+
+<script>
+"use strict";
+
+/* ============================================================
+   A. ZENTRALE KONFIGURATION
+   Alle rechtlich relevanten Werte stehen ausschließlich hier.
+   Bei einer Gesetzesänderung nur diesen Block anpassen.
+   ============================================================ */
+const SEITE = {
+  autor: "Bjørn",
+  quelleText: "Lernportal (Link hier eintragen)",
+  quelleUrl: "https://codeberg.org/",
+  rechtsstand: "1. Januar 2026",
+  hinweisFiktiv: "Lohn- und Beitragsbeträge in den Fällen sind fiktiv und dienen nur der Übung."
+};
+
+/* Zusatzstoff: nicht Teil des BA-Theoriestoffs.
+   true = § 11b Abs. 2b erscheint auch im Endlos-Modus.               */
+const OPTIONEN = { u25ImZufallsmodus: false };
+
+const K = {
+  grundfreibetrag: 100,          // § 11b Abs. 2 S. 1 SGB II
+  nachweisgrenze: 400,           // § 11b Abs. 2 S. 2 SGB II
+  versicherungspauschale: 30,    // § 6 Abs. 1 Nr. 1 Bürgergeld-V
+  geringfuegigkeitsgrenze: 603,  // § 8 Abs. 1a SGB IV (2026) -> § 11b Abs. 2b
+  stufen: [
+    { nr: 1, von: 100,  bis: 520,  satz: 0.20 },
+    { nr: 2, von: 520,  bis: 1000, satz: 0.30 },
+    { nr: 3, von: 1000, bis: 1200, satz: 0.10 }
+  ],
+  stufe3MitKind: 1500,           // § 11b Abs. 3 S. 3 SGB II
+  kmSatz: 0.20,                  // § 6 Abs. 1 Nr. 3 b Bürgergeld-V
+  arbeitstage: 19,               // Annahme für die Übungsfälle
+  midijobObergrenze: 2000        // nur für die fiktive Lohnabrechnung
+};
+
+const NORMEN = {
+  einnahme:  "§ 11 Abs. 1 SGB II",
+  brutto:    "§ 2 Abs. 1 Bürgergeld-V",
+  steuer:    "§ 11b Abs. 1 S. 1 Nr. 1",
+  sv:        "§ 11b Abs. 1 S. 1 Nr. 2",
+  pausch:    "§ 11b Abs. 2",
+  pausch2b:  "§ 11b Abs. 2b",
+  vpausch:   "§ 6 Abs. 1 Nr. 1 Bürgergeld-V",
+  stufe1:    "§ 11b Abs. 3 S. 2 Nr. 1",
+  stufe2:    "§ 11b Abs. 3 S. 2 Nr. 2",
+  stufe3:    "§ 11b Abs. 3 S. 2 Nr. 3",
+  frei11a:   "§ 11a Abs. 7 SGB II"
+};
+
+/* ============================================================
+   B. HILFSFUNKTIONEN
+   ============================================================ */
+const c   = e => Math.round(e * 100);            // Euro -> Cent
+const e   = ct => ct / 100;                       // Cent -> Euro
+const fmt = n => n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s).replace(/[&<>"']/g, m =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+/**
+ * Akzeptiert 1.300,00 | 1300,00 | 1300.00 | 1300 | " 1 300,50 € "
+ * Gibt NaN zurück, wenn nichts Verwertbares eingegeben wurde.
+ */
+function parseBetrag(roh) {
+  if (roh == null) return NaN;
+  let s = String(roh).replace(/[\s\u00a0€]/g, "").trim();
+  if (!s) return NaN;
+  const komma = s.lastIndexOf(","), punkt = s.lastIndexOf(".");
+  if (komma > -1 && punkt > -1) {
+    s = komma > punkt
+      ? s.replace(/\./g, "").replace(",", ".")   // deutsch: 1.300,00
+      : s.replace(/,/g, "");                      // englisch: 1,300.00
+  } else if (komma > -1) {
+    s = s.replace(/,/g, ".");
+  } else if (punkt > -1) {
+    const teile = s.split(".");
+    // 1.300 oder 1.300.000 -> Tausenderpunkte; 125.50 -> Dezimalpunkt
+    if (teile.length > 2 || teile[teile.length - 1].length === 3) s = teile.join("");
+  }
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return NaN;
+  return parseFloat(s);
+}
+
+const stimmt = (eingabe, soll) => !isNaN(eingabe) && Math.abs(c(eingabe) - c(soll)) === 0;
+
+/* ============================================================
+   C. BERECHNUNGSKERN
+   Einzige Quelle der Wahrheit: feste Fälle und Zufallsfälle
+   laufen durch dieselbe Funktion. Die Musterlösung wird
+   daraus erzeugt und kann deshalb nicht abweichen.
+   ============================================================ */
+function stufenbetrag(bruttoCent, stufe, hatKind) {
+  const obergrenze = (stufe.nr === 3 && hatKind) ? K.stufe3MitKind : stufe.bis;
+  const von = c(stufe.von), bis = c(obergrenze);
+  if (bruttoCent <= von) return 0;
+  return Math.round((Math.min(bruttoCent, bis) - von) * stufe.satz);
+}
+
+function berechne(fall) {
+  const brutto = c(fall.betrag);
+  const steuer = c(fall.steuer || 0);
+  const sv     = c(fall.sv || 0);
+  const tats   = (fall.aufwendungen || []).reduce((s, a) => s + c(a.betrag), 0);
+  const posten = [];
+  const add = (key, bez, wert, herleitung) =>
+    posten.push({ key, bez, norm: NORMEN[key], wert: e(wert), herleitung });
+
+  if (fall.typ === "ferienjob") {
+    add("frei11a", "Nicht zu berücksichtigende Einnahme", brutto,
+      "Die Erwerbstätigkeit wurde in den Schulferien ausgeübt. Die Einnahme bleibt in voller Höhe " +
+      "außer Betracht – unabhängig von ihrer Höhe. Absetzbeträge nach § 11b sind deshalb gar nicht zu prüfen.");
+    return abschluss(brutto, posten, fall);
+  }
+
+  add("steuer", "Steuern", steuer, steuer === 0
+    ? "Es fallen keine Steuern an."
+    : `Laut Abrechnung ${fmt(e(steuer))} € Lohnsteuer.`);
+  add("sv", fall.typ === "sonstiges" ? "Pflichtbeiträge zur Sozialversicherung" : "SV-Pflichtbeiträge", sv,
+    sv === 0 ? "Es werden keine Pflichtbeiträge einbehalten."
+             : `Laut Abrechnung ${fmt(e(sv))} € Pflichtbeiträge.`);
+
+  if (fall.typ === "sonstiges") {
+    const vp = Math.min(c(K.versicherungspauschale), Math.max(0, brutto - steuer - sv));
+    add("vpausch", "Versicherungspauschale", vp,
+      `Kein Einkommen aus Erwerbstätigkeit: Es gibt keinen Erwerbstätigenfreibetrag nach § 11b Abs. 3. ` +
+      `Abzusetzen ist die Pauschale von ${fmt(K.versicherungspauschale)} € für private Versicherungen ` +
+      `(§ 11b Abs. 1 S. 1 Nr. 3 i. V. m. § 6 Abs. 1 Nr. 1 Bürgergeld-V).`);
+    return abschluss(brutto, posten, fall);
+  }
+
+  const u25 = fall.typ === "u25";
+
+  if (u25) {
+    const betrag = Math.min(c(K.geringfuegigkeitsgrenze), brutto);
+    add("pausch2b", `Absetzbetrag für unter 25-Jährige`, betrag,
+      `Anstelle der 100-€-Pauschale tritt der Betrag nach § 8 Abs. 1a SGB IV, also die ` +
+      `Geringfügigkeitsgrenze von ${fmt(K.geringfuegigkeitsgrenze)} €` +
+      (betrag < c(K.geringfuegigkeitsgrenze) ? ", höchstens jedoch bis zur Höhe des Einkommens" : "") + ".");
+  } else {
+    const nachweis = tats > c(K.grundfreibetrag) && brutto > c(K.nachweisgrenze);
+    add("pausch", "Aufwendungen / Grundfreibetrag", nachweis ? tats : c(K.grundfreibetrag),
+      nachweis
+        ? `Die nachgewiesenen Aufwendungen nach Abs. 1 S. 1 Nr. 3–5 betragen ${fmt(e(tats))} € und übersteigen ` +
+          `damit die Pauschale von ${fmt(K.grundfreibetrag)} €. Da das Erwerbseinkommen über ` +
+          `${fmt(K.nachweisgrenze)} € liegt, sind die tatsächlichen Kosten anzusetzen (§ 11b Abs. 2 S. 2).`
+        : (tats > c(K.grundfreibetrag)
+            ? `Die tatsächlichen Aufwendungen betragen zwar ${fmt(e(tats))} €, das Erwerbseinkommen liegt aber ` +
+              `nicht über ${fmt(K.nachweisgrenze)} €. Der Nachweis höherer Kosten ist deshalb ausgeschlossen; ` +
+              `es bleibt bei der Pauschale von ${fmt(K.grundfreibetrag)} € (§ 11b Abs. 2 S. 1 und 2).`
+            : `Die tatsächlichen Aufwendungen betragen nur ${fmt(e(tats))} € und übersteigen die Pauschale nicht. ` +
+              `Abzusetzen sind daher ${fmt(K.grundfreibetrag)} € (§ 11b Abs. 2 S. 1).`));
+  }
+
+  K.stufen.forEach(stufe => {
+    const key = "stufe" + stufe.nr;
+    const obergrenze = (stufe.nr === 3 && fall.hatKind) ? K.stufe3MitKind : stufe.bis;
+    let wert, text;
+    if (u25 && stufe.nr === 1) {
+      wert = 0;
+      text = "Entfällt: In den Fällen des § 11b Abs. 2b ist Satz 2 Nummer 1 nicht anzuwenden (§ 11b Abs. 3 S. 4).";
+    } else {
+      wert = stufenbetrag(brutto, stufe, fall.hatKind);
+      if (wert === 0) {
+        text = `Das Einkommen übersteigt ${fmt(stufe.von)} € nicht. Die Stufe entfällt.`;
+      } else {
+        const basis = Math.min(brutto, c(obergrenze)) - c(stufe.von);
+        text = `(${fmt(Math.min(e(brutto), obergrenze))} € − ${fmt(stufe.von)} €) = ${fmt(e(basis))} €, ` +
+               `davon ${Math.round(stufe.satz * 100)} % = ${fmt(e(wert))} €` +
+               (stufe.nr === 3 && fall.hatKind
+                 ? ` – die Obergrenze steigt wegen des minderjährigen Kindes auf ${fmt(K.stufe3MitKind)} € (§ 11b Abs. 3 S. 3).`
+                 : ".");
+      }
+    }
+    add(key, `Freibetrag Stufe ${stufe.nr} (${Math.round(stufe.satz * 100)} %)`, wert, text);
+  });
+
+  return abschluss(brutto, posten, fall);
+}
+
+function abschluss(bruttoCent, posten, fall) {
+  const summe = posten.reduce((s, p) => s + c(p.wert), 0);
+  const gedeckelt = Math.min(summe, bruttoCent);
+  return {
+    einnahmeBez: fall.typ === "sonstiges" ? "Einnahme (brutto)" : "Bruttoeinkommen",
+    einnahmeNorm: fall.typ === "sonstiges" ? NORMEN.einnahme : NORMEN.brutto,
+    einnahme: e(bruttoCent),
+    posten,
+    summeAbzug: e(gedeckelt),
+    final: e(Math.max(0, bruttoCent - summe)),
+    ueberschritten: summe > bruttoCent,
+    abschnitt: fall.typ === "ferienjob" ? "Nicht zu berücksichtigen" : "Absetzbeträge"
+  };
+}
+
+/* ============================================================
+   D. FESTE ÜBUNGSFÄLLE
+   ============================================================ */
+const VP = { bez: "Versicherungspauschale", betrag: K.versicherungspauschale };
+const fahrt = km => ({ bez: `Fahrtkosten (${km} km × ${fmt(K.kmSatz)} € × ${K.arbeitstage} Tage)`,
+                       betrag: Math.round(km * K.kmSatz * K.arbeitstage * 100) / 100 });
+
+const FAELLE = [
+  {
+    titel: "01 · Aufwendungen über 100 €",
+    person: "Frau Müller ist alleinstehend und hat keine Kinder.",
+    typ: "erwerb", hatKind: false,
+    betrag: 1300, steuer: 90, sv: 240,
+    aufwendungen: [VP, { bez: "Kfz-Haftpflicht", betrag: 45 }, { bez: "Fahrtkosten", betrag: 50 }],
+    merke: "Über 400 € Erwerbseinkommen kann die 100-€-Pauschale durch höhere nachgewiesene Kosten verdrängt werden."
+  },
+  {
+    titel: "02 · Aufwendungen unter 100 €",
+    person: "Herr Schmidt arbeitet in Teilzeit und fährt mit dem Fahrrad zur Arbeit.",
+    typ: "erwerb", hatKind: false,
+    betrag: 1000, steuer: 0, sv: 200,
+    aufwendungen: [VP, { bez: "Beiträge zur Riester-Rente", betrag: 20 }],
+    merke: "Bleiben die tatsächlichen Kosten unter 100 €, wird die Pauschale angesetzt – die höhere Zahl gewinnt."
+  },
+  {
+    titel: "03 · Minijob 500 €",
+    person: "Lisa hat einen Minijob.",
+    typ: "erwerb", hatKind: false,
+    betrag: 500, steuer: 0, sv: 0,
+    aufwendungen: [VP],
+    merke: "Stufe 1 wird nur aus dem Teil über 100 € berechnet, nicht aus dem gesamten Einkommen."
+  },
+  {
+    titel: "04 · Einkommen genau 100 €",
+    person: "Viona verdient in einem Minijob 100 € monatlich.",
+    typ: "erwerb", hatKind: false,
+    betrag: 100, steuer: 0, sv: 0,
+    aufwendungen: [VP],
+    merke: "Bis einschließlich 100 € bleibt nach Abzug der Pauschale nichts übrig – ein Erwerbstätigenfreibetrag entsteht gar nicht."
+  },
+  {
+    titel: "05 · Erhöhte Grenze mit Kind",
+    person: "Herr Yilmaz ist alleinerziehend mit einem 14-jährigen Kind.",
+    typ: "erwerb", hatKind: true,
+    betrag: 1400, steuer: 0, sv: 280,
+    aufwendungen: [VP],
+    merke: "Mit minderjährigem Kind endet Stufe 3 erst bei 1.500 € statt bei 1.200 €."
+  },
+  {
+    titel: "06 · Deckelung bei 1.500 € trotz Kind",
+    person: "Frau Novak lebt mit ihrer 9-jährigen Tochter zusammen und verdient 1.800 € brutto.",
+    typ: "erwerb", hatKind: true,
+    betrag: 1800, steuer: 70, sv: 360,
+    aufwendungen: [VP, fahrt(30)],
+    merke: "Auch mit Kind ist bei 1.500 € Schluss. Alles darüber bleibt ohne Freibetrag."
+  },
+  {
+    titel: "07 · Auszubildender unter 25 (Zusatzstoff)",
+    zusatz: true,
+    person: "Jonas (19) macht eine nach § 57 SGB III förderungsfähige Berufsausbildung und lebt in der Bedarfsgemeinschaft seiner Mutter.",
+    typ: "u25", hatKind: false,
+    betrag: 900, steuer: 0, sv: 150,
+    aufwendungen: [VP],
+    merke: "Unter 25 in Ausbildung: statt 100 € greift die Geringfügigkeitsgrenze – und Stufe 1 entfällt dafür."
+  },
+  {
+    titel: "08 · Ferienjob einer Schülerin",
+    person: "Mia (17) besucht das Gymnasium und arbeitet ausschließlich in den Sommerferien in einem Café.",
+    typ: "ferienjob", hatKind: false,
+    betrag: 800, steuer: 0, sv: 0,
+    aufwendungen: [],
+    merke: "Ferienarbeit von Schülern unter 25 ist ohne Obergrenze anrechnungsfrei. Maßgeblich ist der Zeitraum der Arbeit, nicht der Zufluss."
+  },
+  {
+    titel: "09 · Krankengeld statt Lohn",
+    person: "Herr Berger ist langzeiterkrankt und bezieht Krankengeld. Er übt keine Erwerbstätigkeit aus.",
+    typ: "sonstiges", hatKind: false,
+    betrag: 780, steuer: 0, sv: 96.72,
+    einnahmeArt: "Krankengeld",
+    aufwendungen: [],
+    merke: "Ohne Erwerbstätigkeit gibt es keinen Freibetrag nach § 11b Abs. 3 – nur die 30-€-Versicherungspauschale."
+  },
+  {
+    titel: "10 · Minijob-Grenze ≠ Freibetragsstufe",
+    person: "Frau Krause arbeitet als Minijobberin und verdient genau die Geringfügigkeitsgrenze.",
+    typ: "erwerb", hatKind: false,
+    betrag: K.geringfuegigkeitsgrenze, steuer: 0, sv: 0,
+    aufwendungen: [VP],
+    merke: `Die Minijob-Grenze (${fmt(K.geringfuegigkeitsgrenze)} €) hat nichts mit der Stufengrenze von 520 € zu tun. Stufe 2 greift hier bereits.`
+  }
+];
+
+/* ============================================================
+   E. ZUFALLSFÄLLE
+   ============================================================ */
+const zufallInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const zufallAus = arr => arr[zufallInt(0, arr.length - 1)];
+
+function lohnabzuege(betrag) {
+  let sv = 0, steuer = 0;
+  if (betrag > K.geringfuegigkeitsgrenze) {
+    const anteil = betrag >= K.midijobObergrenze
+      ? 0.20
+      : 0.20 * (betrag - K.geringfuegigkeitsgrenze) / (K.midijobObergrenze - K.geringfuegigkeitsgrenze);
+    sv = Math.round(betrag * anteil * 100) / 100;
+  }
+  if (betrag > 1300) steuer = Math.round((betrag - 1300) * 0.14 * 100) / 100;
+  return { sv, steuer };
+}
+
+function zufallsFall() {
+  const w = Math.random();
+  if (OPTIONEN.u25ImZufallsmodus) {
+    if (w < 0.58) return zufallErwerb();
+    if (w < 0.75) return zufallU25();
+    if (w < 0.90) return zufallSonstiges();
+    return zufallFerien();
+  }
+  if (w < 0.70) return zufallErwerb();
+  if (w < 0.88) return zufallSonstiges();
+  return zufallFerien();
+}
+
+function zufallErwerb() {
+  const betrag = zufallInt(11, 230) * 10;                 // 110 – 2.300 €
+  const hatKind = Math.random() < 0.45;
+  const { sv, steuer } = lohnabzuege(betrag);
+  const sparsam = Math.random() < 0.35;                    // erzwingt Fälle unter 100 €
+  const auf = [VP];
+  if (!sparsam) {
+    if (Math.random() < 0.7) auf.push({ bez: "Kfz-Haftpflicht", betrag: zufallInt(25, 70) });
+    const km = zufallInt(4, 35);
+    auf.push(fahrt(km));
+  }
+  return {
+    titel: "🎲 Zufallsfall",
+    person: `Erwerbstätige Person, ${hatKind ? "mit mindestens einem minderjährigen Kind in der Bedarfsgemeinschaft" : "ohne Kinder"}.`,
+    typ: "erwerb", hatKind, betrag, steuer, sv, aufwendungen: auf,
+    merke: "Erst Absetzbeträge nach Abs. 1 und 2 prüfen, dann die Stufen nach Abs. 3 aus dem Bruttoeinkommen bilden."
+  };
+}
+
+function zufallU25() {
+  const betrag = zufallInt(30, 150) * 10;                 // 300 – 1.500 €
+  const { sv, steuer } = lohnabzuege(betrag);
+  const rolle = zufallAus([
+    "befindet sich in einer nach § 57 SGB III förderungsfähigen Berufsausbildung",
+    "absolviert eine nach dem BAföG dem Grunde nach förderungsfähige Ausbildung",
+    "leistet einen Bundesfreiwilligendienst",
+    "besucht eine berufsbildende Schule und arbeitet außerhalb der Schulferien"
+  ]);
+  return {
+    titel: "🎲 Zufallsfall",
+    person: `Die leistungsberechtigte Person ist ${zufallInt(16, 24)} Jahre alt und ${rolle}.`,
+    typ: "u25", hatKind: false, zusatz: true, betrag, steuer, sv, aufwendungen: [VP],
+    merke: "Bei § 11b Abs. 2b tritt die Geringfügigkeitsgrenze an die Stelle der 100-€-Pauschale; Stufe 1 entfällt."
+  };
+}
+
+function zufallSonstiges() {
+  const art = zufallAus(["Krankengeld", "Arbeitslosengeld", "Witwenrente", "Unterhaltszahlung"]);
+  const betrag = zufallInt(35, 140) * 10;
+  const sv = (art === "Krankengeld" || art === "Arbeitslosengeld")
+    ? Math.round(betrag * 0.124 * 100) / 100 : 0;
+  return {
+    titel: "🎲 Zufallsfall",
+    person: `Die leistungsberechtigte Person bezieht ${art} und übt keine Erwerbstätigkeit aus.`,
+    typ: "sonstiges", hatKind: false, betrag, steuer: 0, sv,
+    einnahmeArt: art, aufwendungen: [],
+    merke: "Kein Erwerbseinkommen heißt: kein Freibetrag nach Abs. 3, nur die Versicherungspauschale."
+  };
+}
+
+function zufallFerien() {
+  return {
+    titel: "🎲 Zufallsfall",
+    person: `Schülerin bzw. Schüler (${zufallInt(15, 24)} Jahre) einer allgemeinbildenden Schule, ` +
+            `Tätigkeit ausschließlich während der Schulferien.`,
+    typ: "ferienjob", hatKind: false,
+    betrag: zufallInt(30, 180) * 10, steuer: 0, sv: 0, aufwendungen: [],
+    merke: "Ferienarbeit von Schülern unter 25 bleibt ohne Obergrenze außer Betracht."
+  };
+}
+
+/* ============================================================
+   F. ZUSTAND
+   ============================================================ */
+let fall = null;      // aktueller Fall
+let loesung = null;   // Ergebnis von berechne()
+let modus = "basis";
+let versuche = 0;
+let serie = Number(localStorage.getItem("sgb11b-serie") || 0);
+
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   G. DARSTELLUNG
+   ============================================================ */
+function zeigeFall() {
+  const artName = fall.einnahmeArt || (fall.typ === "sonstiges" ? "Einnahme" : "Lohnabrechnung");
+  let zeilen = "";
+  const zeile = (bez, wert) =>
+    `<div class="zeile"><span>${esc(bez)}</span><span>${fmt(wert)} €</span></div>`;
+
+  zeilen += zeile(fall.typ === "sonstiges" ? artName + " (brutto)" : "Brutto", fall.betrag);
+  if (fall.typ !== "ferienjob") {
+    zeilen += zeile("Steuern", fall.steuer || 0);
+    zeilen += zeile("Sozialversicherung", fall.sv || 0);
+  }
+
+  let kosten = "";
+  if (fall.aufwendungen && fall.aufwendungen.length) {
+    kosten = `<p class="gruppe">Tatsächliche Aufwendungen (Nr. 3–5)</p>` +
+      fall.aufwendungen.map(a => zeile(a.bez, a.betrag)).join("");
+  }
+
+  const marke = fall.zusatz
+    ? `<p class="zusatzmarke">Zusatzstoff – nicht Bestandteil des BA-Theoriestoffs</p>` : "";
+
+  $("fallText").innerHTML =
+    `${marke}<h2 id="fallUeberschrift">${esc(fall.titel)}</h2>
+     <p>${esc(fall.person)}</p>
+     <p class="gruppe">${esc(artName)}</p>${zeilen}${kosten}`;
+
+  $("fallHinweis").innerHTML = `<strong>Merke:</strong> ${esc(fall.merke)}`;
+}
+
+function zeigeStatus(korrekt, gesamt) {
+  const teil = gesamt
+    ? `<div><span class="wert">${korrekt}/${gesamt}</span> Werte korrekt</div>`
+    : `<div>Noch nicht geprüft.</div>`;
+  $("statusBox").innerHTML =
+    `${teil}
+     <div>Versuche in diesem Fall: <strong>${versuche}</strong></div>
+     <div>Serie fehlerfreier Fälle: <strong>${serie}</strong></div>`;
+}
+
+function schrittHtml(key, bez, norm, klasse) {
+  return `
+  <div class="schritt ${klasse || ""}" data-key="${key}">
+    <div class="schritt-text">
+      <label for="in_${key}">${esc(bez)}</label>
+      ${norm ? `<span class="gesetz">${esc(norm)}</span>` : ""}
+    </div>
+    <div class="eingabe-gruppe">
+      <input type="text" inputmode="decimal" autocomplete="off" id="in_${key}"
+             aria-describedby="fb_${key}" placeholder="0,00"> €
+      <span class="rueckmeldung" id="fb_${key}"></span>
+    </div>
+  </div>`;
+}
+
+function zeigeBasis() {
+  let html = `<h2 class="abschnitt">A · Einnahme</h2>` +
+    schrittHtml("einnahme", loesung.einnahmeBez, loesung.einnahmeNorm);
+
+  html += `<h2 class="abschnitt">B · ${esc(loesung.abschnitt)}</h2>`;
+  loesung.posten.forEach(p => { html += schrittHtml(p.key, p.bez, p.norm); });
+
+  html += `<h2 class="abschnitt ergebnis">C · Ergebnis</h2>` +
+    schrittHtml("summeAbzug", "Summe der Absetzbeträge", "Summe aus B", "summe") +
+    schrittHtml("final", "Anzurechnendes Einkommen", "Einnahme − Summe", "final");
+
+  $("basisModus").innerHTML = html;
+}
+
+function zeigePro() {
+  $("proModus").innerHTML =
+    `<h2 class="abschnitt">Berechnungsschritte selbst festlegen</h2>` +
+    schrittHtml("proEinnahme", loesung.einnahmeBez, loesung.einnahmeNorm) +
+    `<div id="proZeilen"></div>
+     <div class="pro-leer" id="proLeer">Noch keine Position angelegt.</div>
+     <button class="knopf knopf-primaer" type="button" id="btnZeile">+ Position hinzufügen</button>
+     <h2 class="abschnitt ergebnis">Ergebnis</h2>` +
+    schrittHtml("proSumme", "Summe der Absetzbeträge", null, "summe") +
+    schrittHtml("proFinal", "Anzurechnendes Einkommen", null, "final");
+  $("btnZeile").addEventListener("click", () => zeileHinzu());
+}
+
+const PRO_KATALOG = [
+  ["steuer",   "§ 11b Abs. 1 S. 1 Nr. 1 – Steuern"],
+  ["sv",       "§ 11b Abs. 1 S. 1 Nr. 2 – SV-Pflichtbeiträge"],
+  ["pausch",   "§ 11b Abs. 2 – Aufwendungen / Grundfreibetrag"],
+  ["pausch2b", "§ 11b Abs. 2b – Absetzbetrag unter 25 Jahren (Zusatzstoff)"],
+  ["vpausch",  "§ 6 Abs. 1 Nr. 1 Bürgergeld-V – Versicherungspauschale"],
+  ["stufe1",   "§ 11b Abs. 3 S. 2 Nr. 1 – Stufe 1 (20 %)"],
+  ["stufe2",   "§ 11b Abs. 3 S. 2 Nr. 2 – Stufe 2 (30 %)"],
+  ["stufe3",   "§ 11b Abs. 3 S. 2 Nr. 3 – Stufe 3 (10 %)"],
+  ["frei11a",  "§ 11a Abs. 7 – nicht zu berücksichtigende Einnahme"]
+];
+
+let zeilenZaehler = 0;
+function zeileHinzu() {
+  const id = "z" + (++zeilenZaehler);
+  const div = document.createElement("div");
+  div.className = "schritt pro-zeile";
+  div.id = id;
+  div.innerHTML = `
+    <div class="schritt-text">
+      <label for="sel_${id}" class="sr-only">Art der Position</label>
+      <select class="pro-auswahl" id="sel_${id}">
+        <option value="">– Position wählen –</option>
+        ${PRO_KATALOG.map(([k, t]) => `<option value="${k}">${esc(t)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="eingabe-gruppe">
+      <label for="in_${id}" class="sr-only">Betrag</label>
+      <input type="text" inputmode="decimal" autocomplete="off" id="in_${id}"
+             class="pro-wert" aria-describedby="fb_${id}" placeholder="0,00"> €
+      <button type="button" class="knopf knopf-loeschen" aria-label="Position entfernen">✕</button>
+      <span class="rueckmeldung" id="fb_${id}"></span>
+    </div>`;
+  div.querySelector(".knopf-loeschen").addEventListener("click", () => {
+    div.remove();
+    $("proLeer").textContent = "Noch keine Position angelegt.";
+    $("proLeer").hidden = $("proZeilen").children.length > 0;
+  });
+  $("proZeilen").appendChild(div);
+  $("proLeer").hidden = true;
+  $("sel_" + id).focus();
+}
+
+/* ============================================================
+   H. PRÜFUNG
+   ============================================================ */
+function setzeFeedback(key, text, ok) {
+  const fb = $("fb_" + key), inp = $("in_" + key);
+  if (!fb) return;
+  fb.textContent = text;
+  fb.className = "rueckmeldung " + (ok ? "ok" : "fehler");
+  if (inp) {
+    inp.setAttribute("aria-invalid", ok ? "false" : "true");
+    const zeile = inp.closest(".schritt");
+    if (zeile) { zeile.classList.toggle("ok", ok); zeile.classList.toggle("fehler", !ok); }
+  }
+}
+
+function pruefeFeld(key, soll) {
+  const inp = $("in_" + key);
+  const wert = parseBetrag(inp.value);
+  if (isNaN(wert)) { setzeFeedback(key, "leer", false); return false; }
+  const ok = stimmt(wert, soll);
+  setzeFeedback(key, ok ? "✓ korrekt" : "✗ falsch", ok);
+  return ok;
+}
+
+function pruefen() {
+  versuche++;
+  let korrekt = 0, gesamt = 0;
+
+  if (modus === "basis") {
+    gesamt = 3 + loesung.posten.length;
+    if (pruefeFeld("einnahme", loesung.einnahme)) korrekt++;
+    loesung.posten.forEach(p => { if (pruefeFeld(p.key, p.wert)) korrekt++; });
+    if (pruefeFeld("summeAbzug", loesung.summeAbzug)) korrekt++;
+    if (pruefeFeld("final", loesung.final)) korrekt++;
+  } else {
+    const soll = {};
+    loesung.posten.forEach(p => soll[p.key] = p.wert);
+    const gesehen = new Set();
+    const pflicht = loesung.posten.filter(p => p.wert > 0).map(p => p.key);
+
+    gesamt = 3 + pflicht.length;
+    if (pruefeFeld("proEinnahme", loesung.einnahme)) korrekt++;
+
+    document.querySelectorAll(".pro-zeile").forEach(z => {
+      const key = z.querySelector("select").value;
+      const roh = z.querySelector(".pro-wert").value;
+      const fb  = z.querySelector(".rueckmeldung");
+      const inp = z.querySelector(".pro-wert");
+      const melde = (t, ok) => {
+        fb.textContent = t;
+        fb.className = "rueckmeldung " + (ok ? "ok" : "fehler");
+        inp.setAttribute("aria-invalid", ok ? "false" : "true");
+        z.classList.toggle("ok", ok); z.classList.toggle("fehler", !ok);
+      };
+      if (!key) { melde("keine Position", false); return; }
+      if (gesehen.has(key)) { melde("doppelt", false); return; }
+      gesehen.add(key);
+      if (!(key in soll)) { melde("gehört nicht hierher", false); return; }
+      const wert = parseBetrag(roh);
+      if (isNaN(wert)) { melde("leer", false); return; }
+      const ok = stimmt(wert, soll[key]);
+      melde(ok ? "✓ korrekt" : "✗ falsch", ok);
+      if (ok && soll[key] > 0) korrekt++;
+    });
+
+    const fehlend = pflicht.filter(k => !gesehen.has(k));
+    if (pruefeFeld("proSumme", loesung.summeAbzug)) korrekt++;
+    if (pruefeFeld("proFinal", loesung.final)) korrekt++;
+
+    if (fehlend.length) {
+      const namen = fehlend.map(k => loesung.posten.find(p => p.key === k).bez);
+      $("proLeer").hidden = false;
+      $("proLeer").textContent = "Es fehlen noch: " + namen.join(", ");
+    } else {
+      $("proLeer").hidden = document.querySelectorAll(".pro-zeile").length > 0;
+      $("proLeer").textContent = "Noch keine Position angelegt.";
+    }
+  }
+
+  if (korrekt === gesamt && versuche === 1) {
+    serie++; localStorage.setItem("sgb11b-serie", serie);
+  } else if (korrekt !== gesamt) {
+    serie = 0; localStorage.setItem("sgb11b-serie", 0);
+  }
+
+  zeigeStatus(korrekt, gesamt);
+  $("liveStatus").textContent =
+    `${korrekt} von ${gesamt} Werten korrekt.` + (korrekt === gesamt ? " Fall vollständig gelöst." : "");
+  $("btnRechenweg").disabled = false;
+}
+
+/* ============================================================
+   I. RECHENWEG
+   ============================================================ */
+function rechenwegHtml() {
+  const li = loesung.posten.map(p =>
+    `<li><strong>${esc(p.bez)}</strong> <span class="gesetz">${esc(p.norm)}</span><br>
+     ${esc(p.herleitung)}<br><strong>= ${fmt(p.wert)} €</strong></li>`).join("");
+  return `<h3>Musterlösung</h3>
+    <p><strong>${esc(loesung.einnahmeBez)}: ${fmt(loesung.einnahme)} €</strong></p>
+    <ul>${li}</ul>
+    <div class="summenzeile">
+      Summe der Absetzbeträge: ${fmt(loesung.summeAbzug)} €<br>
+      Anzurechnendes Einkommen: ${fmt(loesung.final)} €
+    </div>
+    ${loesung.ueberschritten ? `<p><em>Die Absetzbeträge übersteigen die Einnahme. Anzurechnen sind daher 0,00 € –
+      ein negatives Einkommen gibt es nicht.</em></p>` : ""}
+    <div class="merke"><strong>Merke:</strong> ${esc(fall.merke)}</div>`;
+}
+
+function toggleRechenweg() {
+  const box = $("rechenwegBox"), btn = $("btnRechenweg");
+  if (box.hidden) {
+    box.innerHTML = rechenwegHtml();
+    box.hidden = false;
+    btn.textContent = "Rechenweg verbergen";
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } else {
+    box.hidden = true;
+    btn.textContent = "Rechenweg zeigen";
+  }
+}
+
+/* ============================================================
+   J. RECHENZEILE
+   Eigener rekursiver Parser – kein eval().
+   Grammatik: expr := term (('+'|'-') term)*
+              term := factor (('*'|'/') factor)*
+            factor := ('+'|'-')? primary '%'*
+           primary := zahl | '(' expr ')'
+   ============================================================ */
+function rechne(roh) {
+  let s = String(roh)
+    .replace(/[\s\u00a0€]/g, "")
+    .replace(/[×·x]/g, "*")
+    .replace(/[÷:]/g, "/")
+    .replace(/[−–—]/g, "-");
+  // Tausenderpunkte nur bei echten Dreiergruppen entfernen (1.300 -> 1300, 0.20 bleibt)
+  s = s.replace(/([1-9]\d{0,2})((?:\.\d{3})+)(?!\d)/g, (m, a, b) => a + b.replace(/\./g, ""));
+  s = s.replace(/,/g, ".");
+  if (!s) return { fehler: "Nichts zu rechnen." };
+  if (!/^[0-9.+\-*/()%]+$/.test(s)) return { fehler: "Nicht erlaubtes Zeichen." };
+
+  let i = 0;
+  const zeichen = () => s[i];
+
+  function expr() {
+    let v = term();
+    while (zeichen() === "+" || zeichen() === "-") {
+      const op = s[i++]; const r = term();
+      v = (op === "+") ? v + r : v - r;
+    }
+    return v;
+  }
+  function term() {
+    let v = factor();
+    while (zeichen() === "*" || zeichen() === "/") {
+      const op = s[i++]; const r = factor();
+      if (op === "/" && r === 0) throw new Error("Division durch null.");
+      v = (op === "*") ? v * r : v / r;
+    }
+    return v;
+  }
+  function factor() {
+    if (zeichen() === "-") { i++; return -factor(); }
+    if (zeichen() === "+") { i++; return factor(); }
+    let v = primary();
+    while (zeichen() === "%") { i++; v = v / 100; }
+    return v;
+  }
+  function primary() {
+    if (zeichen() === "(") {
+      i++; const v = expr();
+      if (s[i] !== ")") throw new Error("Es fehlt eine schließende Klammer.");
+      i++; return v;
+    }
+    const start = i;
+    while (i < s.length && /[0-9.]/.test(s[i])) i++;
+    const teil = s.slice(start, i);
+    if (!teil || teil === ".") throw new Error("Hier wurde eine Zahl erwartet.");
+    if ((teil.match(/\./g) || []).length > 1) throw new Error("Zahl mit mehreren Trennzeichen.");
+    return parseFloat(teil);
+  }
+
+  try {
+    const wert = expr();
+    if (i < s.length) throw new Error("Unerwartetes Zeichen an Stelle " + (i + 1) + ".");
+    if (!isFinite(wert)) throw new Error("Kein gültiges Ergebnis.");
+    return { wert };
+  } catch (err) {
+    return { fehler: err.message };
+  }
+}
+
+let letztesFeld = null;
+let trWert = null;
+const trProtokoll = [];
+
+function trOffen() { return !$("tr").hidden; }
+
+function trSetzeOffen(offen) {
+  const panel = $("tr"), auf = $("trAuf");
+  panel.hidden = !offen;
+  auf.hidden = offen;
+  auf.setAttribute("aria-expanded", String(offen));
+  if (offen) {
+    document.body.style.paddingBottom = (panel.offsetHeight + 24) + "px";
+    $("trEingabe").focus();
+    $("trEingabe").select();
+  } else {
+    document.body.style.paddingBottom = "";
+    (letztesFeld || auf).focus();
+  }
+}
+
+function trRechnen() {
+  const roh = $("trEingabe").value;
+  const box = $("trErgebnis");
+  const erg = rechne(roh);
+  if (erg.fehler) {
+    trWert = null;
+    box.className = "tr-ergebnis fehler";
+    box.textContent = erg.fehler;
+    $("trUebernehmen").disabled = true;
+    return;
+  }
+  trWert = Math.round(erg.wert * 100) / 100;
+  box.className = "tr-ergebnis";
+  const abweichung = Math.abs(erg.wert - trWert) > 1e-9;
+  box.innerHTML = `= ${esc(fmt(trWert))} €` +
+    (abweichung ? `<span class="roh">ungerundet ${esc(String(erg.wert))} – kaufmännisch gerundet nach § 41 Abs. 2 SGB II</span>` : "");
+  $("trUebernehmen").disabled = !letztesFeld;
+  trMerken(roh.trim(), trWert);
+}
+
+function trMerken(ausdruck, wert) {
+  if (!ausdruck) return;
+  trProtokoll.unshift({ ausdruck, wert });
+  trProtokoll.splice(3);
+  $("trProtokoll").innerHTML = trProtokoll.map((z, n) =>
+    `<li><button type="button" data-n="${n}">${esc(z.ausdruck)} = ${esc(fmt(z.wert))} €</button></li>`).join("");
+}
+
+function trUebernehmen() {
+  if (trWert === null || !letztesFeld) return;
+  letztesFeld.value = fmt(trWert);
+  letztesFeld.removeAttribute("aria-invalid");
+  $("liveStatus").textContent = fmt(trWert) + " € übernommen.";
+  trSetzeOffen(false);
+}
+
+/* ============================================================
+   K. STEUERUNG
+   ============================================================ */
+function ladeFall(neu) {
+  const wahl = $("fallAuswahl").value;
+  $("btnNeuerFall").hidden = wahl !== "zufall";
+  fall = (wahl === "zufall") ? zufallsFall() : FAELLE[Number(wahl)];
+  loesung = berechne(fall);
+  versuche = 0;
+  zeigeFall();
+  zeigeBasis();
+  zeigePro();
+  leeren();
+  zeigeStatus(0, 0);
+  if (neu) $("liveStatus").textContent = "Neuer Fall geladen: " + fall.titel;
+}
+
+function leeren() {
+  document.querySelectorAll("input[type=text]:not(#trEingabe)").forEach(i => {
+    i.value = "";
+    i.removeAttribute("aria-invalid");
+  });
+  document.querySelectorAll(".rueckmeldung").forEach(f => {
+    f.textContent = ""; f.className = "rueckmeldung";
+  });
+  document.querySelectorAll(".schritt").forEach(s => s.classList.remove("ok", "fehler"));
+  document.querySelectorAll(".pro-zeile").forEach(z => z.remove());
+  if ($("proLeer")) { $("proLeer").hidden = false; $("proLeer").textContent = "Noch keine Position angelegt."; }
+  $("rechenwegBox").hidden = true;
+  $("btnRechenweg").disabled = true;
+  $("btnRechenweg").textContent = "Rechenweg zeigen";
+}
+
+function setzeModus(neu) {
+  modus = neu;
+  $("modusBasis").setAttribute("aria-pressed", String(neu === "basis"));
+  $("modusPro").setAttribute("aria-pressed", String(neu === "pro"));
+  $("basisModus").hidden = neu !== "basis";
+  $("proModus").hidden = neu !== "pro";
+  leeren();
+  versuche = 0;
+  zeigeStatus(0, 0);
+}
+
+function setzeThema(dunkel) {
+  document.body.classList.toggle("dunkel", dunkel);
+  $("themeToggle").setAttribute("aria-pressed", String(dunkel));
+  $("themeToggle").setAttribute("aria-label",
+    dunkel ? "Zur hellen Darstellung wechseln" : "Zur dunklen Darstellung wechseln");
+  $("themeToggle").innerHTML = dunkel
+    ? '☀️<span class="lang"> Hell</span>' : '🌙<span class="lang"> Dunkel</span>';
+  localStorage.setItem("sgb11b-thema", dunkel ? "dunkel" : "hell");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setzeThema(localStorage.getItem("sgb11b-thema") === "dunkel");
+
+  const sel = $("fallAuswahl");
+  FAELLE.forEach((f, i) => {
+    const opt = new Option(f.titel, String(i));
+    if (f.zusatz) opt.dataset.zusatz = "1";
+    sel.add(opt);
+  });
+  sel.add(new Option("🎲 Endlos-Modus (Zufallsfall)", "zufall"));
+
+  sel.addEventListener("change", () => ladeFall(true));
+  $("btnNeuerFall").addEventListener("click", () => ladeFall(true));
+  $("btnPruefen").addEventListener("click", pruefen);
+  $("btnRechenweg").addEventListener("click", toggleRechenweg);
+  $("btnLeeren").addEventListener("click", () => { leeren(); versuche = 0; zeigeStatus(0, 0); });
+  $("modusBasis").addEventListener("click", () => setzeModus("basis"));
+  $("modusPro").addEventListener("click", () => setzeModus("pro"));
+  $("themeToggle").addEventListener("click", () =>
+    setzeThema(!document.body.classList.contains("dunkel")));
+
+  document.addEventListener("keydown", ev => {
+    const imRechner = ev.target.closest && ev.target.closest("#tr");
+    if (ev.key === "Escape" && trOffen()) { ev.preventDefault(); trSetzeOffen(false); return; }
+    if (ev.altKey && ev.key.toLowerCase() === "r") { ev.preventDefault(); trSetzeOffen(!trOffen()); return; }
+    if (imRechner) {
+      if (ev.key === "Enter") { ev.preventDefault(); trRechnen(); }
+      return;
+    }
+    if (ev.key === "Enter" && ev.target.matches("input[type=text]")) { ev.preventDefault(); pruefen(); }
+    if (ev.key === "Enter" && ev.ctrlKey) { ev.preventDefault(); pruefen(); }
+  });
+
+  document.addEventListener("focusin", ev => {
+    if (ev.target.matches("input[type=text]") && !ev.target.closest("#tr")) {
+      letztesFeld = ev.target;
+      if (trOffen()) $("trUebernehmen").disabled = (trWert === null);
+    }
+  });
+  $("trAuf").addEventListener("click", () => trSetzeOffen(true));
+  $("trZu").addEventListener("click", () => trSetzeOffen(false));
+  $("trGleich").addEventListener("click", trRechnen);
+  $("trUebernehmen").addEventListener("click", trUebernehmen);
+  $("trProtokoll").addEventListener("click", ev => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    $("trEingabe").value = trProtokoll[Number(b.dataset.n)].ausdruck;
+    $("trEingabe").focus();
+    trRechnen();
+  });
+  window.addEventListener("resize", () => { if (trOffen()) trSetzeOffen(true); });
+
+  $("fusszeile").innerHTML =
+    `Erstellt von ${esc(SEITE.autor)} · Rechtsstand: ${esc(SEITE.rechtsstand)}<br>
+     <a href="${esc(SEITE.quelleUrl)}" target="_blank" rel="noopener noreferrer">${esc(SEITE.quelleText)} ↗</a><br>
+     Tastatur: Enter prüft · Alt + R öffnet die Rechenzeile · Esc schließt sie.<br>
+     ${esc(SEITE.hinweisFiktiv)} Kein Ersatz für eine rechtsverbindliche Prüfung im Einzelfall.`;
+
+  setzeModus("basis");
+  ladeFall(false);
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
